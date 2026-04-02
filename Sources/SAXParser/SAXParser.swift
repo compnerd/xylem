@@ -94,9 +94,9 @@ public struct SAXParser<Processor: Handler> {
 
       case let .text(text):
         handler.location = location
-        let processed = token.processed
-        let expanded = if !processed { try buffer.replace(expanding: text) } else { false }
-        if expanded {
+        if token.processed {
+          try handler.characters(text)
+        } else if try buffer.replace(expanding: text) {
           let expanded = buffer
           try handler.characters(expanded.span)
         } else {
@@ -357,9 +357,9 @@ extension SAXParser where Processor.Failure == Never {
 
       case let .text(text):
         handler.location = location
-        let processed = token.processed
-        let expanded = if !processed { try buffer.replace(expanding: text) } else { false }
-        if expanded {
+        if token.processed {
+          handler.characters(text)
+        } else if try buffer.replace(expanding: text) {
           let expanded = buffer
           handler.characters(expanded.span)
         } else {
