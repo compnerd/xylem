@@ -15,7 +15,7 @@ package enum Expansion {
           || byte == UInt8(ascii: "\r")
 
     case .text:
-      byte == UInt8(ascii: "&") || byte == UInt8(ascii: "]")
+      byte == UInt8(ascii: "&")
     }
   }
 
