@@ -184,7 +184,7 @@ extension XPath {
         }
 
         do throws(XML.Error) {
-          advance(try XML.Name.scan(bytes.span.extracting(index...)).bytes)
+          try advance(XML.Name.scan(bytes.span.extracting(index...)).bytes)
         } catch {
           throw .invalidExpression("invalid XML name")
         }

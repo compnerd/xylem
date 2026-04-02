@@ -19,7 +19,7 @@ extension XPath.Expression {
       return value
 
     case let .path(path):
-      return .set(try evaluate(path: path, in: document, context: context))
+      return try .set(evaluate(path: path, in: document, context: context))
 
     case let .compose(primary, path):
       let bases = try evaluate(primary, in: document, context: context).nodes
@@ -27,7 +27,7 @@ extension XPath.Expression {
       // Common case: single base node — no deduplication set needed.
       if bases.count == 1 {
         let scoped = XPath.Context(node: bases[0], sharing: context._vars)
-        return .set(try evaluate(path: path, in: document, context: scoped))
+        return try .set(evaluate(path: path, in: document, context: scoped))
       }
       var result: [Document.Reference] = []
       var seen: Set<Document.Reference> = []
@@ -71,11 +71,11 @@ extension XPath.Expression {
     switch operation {
     case .and:
       if try !evaluate(lhs, in: document, context: context).boolean { return .bool(false) }
-      return .bool(try evaluate(rhs, in: document, context: context).boolean)
+      return try .bool(evaluate(rhs, in: document, context: context).boolean)
 
     case .or:
       if try evaluate(lhs, in: document, context: context).boolean { return .bool(true) }
-      return .bool(try evaluate(rhs, in: document, context: context).boolean)
+      return try .bool(evaluate(rhs, in: document, context: context).boolean)
 
     case .eq, .neq:
       // Fast path: @attr = 'literal' — scan attribute list and compare bytes directly,

@@ -342,7 +342,7 @@ extension XML.Lexer {
   private mutating func processing() throws(XML.Error) -> Located<XML.Token>? {
     let start = cursor
     try consume("<?")
-    let target = bytes.extracting(try name())
+    let target = try bytes.extracting(name())
     let data = if spaces() {
       try bytes.extracting(consume(until: "?>"))
     } else {
@@ -420,7 +420,7 @@ extension XML.Lexer {
     let start = cursor
     try consume("<!DOCTYPE")
     guard spaces() else { throw .invalidCharacter }
-    let name = bytes.extracting(try name())
+    let name = try bytes.extracting(name())
     spaces()
     let ids = try externalID() ?? (nil, nil)
 
@@ -443,11 +443,10 @@ extension XML.Lexer {
   private mutating func end() throws(XML.Error) -> Located<XML.Token>? {
     let start = cursor
     try consume("</")
-    let name = bytes.extracting(try name())
+    let name = try bytes.extracting(name())
     spaces()
     try consume(UInt8(ascii: ">"))
-    return Located(value: .end(name: name),
-                   source: source(from: start))
+    return Located(value: .end(name: name), source: source(from: start))
   }
 
   // [41] Attribute ::= Name Eq AttValue
@@ -522,7 +521,7 @@ extension XML.Lexer {
   private mutating func start() throws(XML.Error) -> Located<XML.Token>? {
     let start = cursor
     try consume(UInt8(ascii: "<"))
-    let name = SourceRange(try name())
+    let name = try SourceRange(name())
     spaces()
     let attributes = cursor
 

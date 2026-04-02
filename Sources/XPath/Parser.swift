@@ -211,10 +211,10 @@ extension XPath {
     private mutating func call(name: String) throws(XPath.Error) -> Expression.Node {
       var args: [Expression.Node] = []
       if try lexer.peek() != .rparen {
-        args.append(try expression())
+        try args.append(expression())
         while case .comma = try lexer.peek() {
           try lexer.skip()
-          args.append(try expression())
+          try args.append(expression())
         }
       }
       guard case .rparen = try lexer.next() else {
@@ -362,7 +362,7 @@ extension XPath {
     private mutating func predicates() throws(XPath.Error) -> [Expression.Node] {
       var result: [Expression.Node] = []
       while case .lbracket = try lexer.peek() {
-        result.append(try predicate())
+        try result.append(predicate())
       }
       return result
     }
