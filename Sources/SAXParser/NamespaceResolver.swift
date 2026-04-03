@@ -35,7 +35,7 @@ internal struct NamespaceResolver: ~Copyable, ~Escapable {
   private var arena = Arena()
   private var defaultNamespace: Int?
   private var generation: UInt32 = 0
-  private var scopes: [Int] = []
+  private var scopes = Stack<Int>()
   private var attributes: (records: DoubleBuffer<Record>, visited: ProbeSet) = (.init(), .init())
 
   @_lifetime(borrow source)
@@ -54,13 +54,13 @@ extension NamespaceResolver {
   @_lifetime(borrow attributes)
   internal mutating func mappings(for attributes: borrowing XML.UnresolvedAttributes) throws(XML.Error) -> Range<Int> {
     if attributes.isEmpty {
-      scopes.append(-1)
+      scopes.push(-1)
       self.attributes.records.front.removeAll(keepingCapacity: true)
       return bindings.count ..< bindings.count
     }
 
     let base = bindings.count
-    scopes.append(base)
+    scopes.push(base)
     if attributes.namespaced {
       try resolve(qualified: attributes)
     } else {
@@ -163,7 +163,7 @@ extension NamespaceResolver {
   }
 
   internal mutating func popScope() throws(XML.Error) -> Range<Int> {
-    guard let base = scopes.popLast() else { throw .invalidDocument }
+    guard let base = scopes.pop() else { throw .invalidDocument }
     guard base >= 0 else { return 0 ..< 0 }
     return base ..< bindings.count
   }

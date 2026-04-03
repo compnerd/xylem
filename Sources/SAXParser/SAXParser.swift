@@ -193,8 +193,8 @@ public struct SAXParser<Processor: Handler> {
 }
 
 private struct Parser: ~Copyable, ~Escapable {
-  private struct State {
-    private var elements: [SourceRange] = []
+  private struct State: ~Copyable {
+    private var elements = Stack<SourceRange>()
     private var seenDeclaration = false
     private var seenDoctype = false
     private var seenRoot = false
@@ -235,7 +235,7 @@ private struct Parser: ~Copyable, ~Escapable {
         guard !finishedRoot else { throw .invalidDocument }
         seenRoot = true
         if !closed {
-          elements.append(Self.range(token.source, length: name.count))
+          elements.push(Self.range(token.source, length: name.count))
         } else if elements.isEmpty {
           finishedRoot = true
         }
@@ -244,7 +244,7 @@ private struct Parser: ~Copyable, ~Escapable {
         guard let last = elements.last, name == bytes.extracting(last) else {
           throw .invalidDocument
         }
-        elements.removeLast()
+        elements.pop()
         if elements.isEmpty {
           finishedRoot = true
         }
