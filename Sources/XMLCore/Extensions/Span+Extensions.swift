@@ -104,14 +104,7 @@ extension Span where Element == XML.Byte {
 
   @inline(__always)
   package static func == (_ lhs: borrowing Span<Element>, _ rhs: borrowing String) -> Bool {
-    var rhs = copy rhs
-    return lhs.withUnsafeBufferPointer { lhs in
-      rhs.withUTF8 { rhs in
-        guard lhs.count == rhs.count else { return false }
-        guard !lhs.isEmpty else { return true }
-        return UnsafeRawBufferPointer(lhs).elementsEqual(UnsafeRawBufferPointer(rhs))
-      }
-    }
+    return lhs == rhs.utf8.span
   }
 
   @inline(__always)
@@ -120,7 +113,7 @@ extension Span where Element == XML.Byte {
     guard lhs.count > 0 else { return true }
     return lhs.withUnsafeBufferPointer { lhs in
       return rhs.withUnsafeBufferPointer { rhs in
-        return UnsafeRawBufferPointer(lhs).elementsEqual(UnsafeRawBufferPointer(rhs))
+        return lhs.elementsEqual(rhs)
       }
     }
   }
