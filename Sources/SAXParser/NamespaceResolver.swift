@@ -51,6 +51,7 @@ internal struct NamespaceResolver: ~Copyable, ~Escapable {
 // MARK: - Resolution
 
 extension NamespaceResolver {
+  @_lifetime(&self)
   internal mutating func mappings(for attributes: borrowing XML.UnresolvedAttributes) throws(XML.Error) -> Range<Int> {
     if attributes.isEmpty {
       scopes.push(-1)
@@ -68,6 +69,7 @@ extension NamespaceResolver {
     return base ..< bindings.count
   }
 
+  @_lifetime(&self)
   private mutating func resolve(unqualified attributes: borrowing XML.UnresolvedAttributes) throws(XML.Error) {
     let bytes = attributes.bytes
     let records = attributes.records
@@ -98,6 +100,7 @@ extension NamespaceResolver {
     }
   }
 
+  @_lifetime(&self)
   private mutating func resolve(qualified attributes: borrowing XML.UnresolvedAttributes) throws(XML.Error) {
     let bytes = attributes.bytes
     let records = attributes.records
