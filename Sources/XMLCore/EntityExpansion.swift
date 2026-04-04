@@ -49,6 +49,7 @@ private enum Radix {
   fileprivate func scan(_ bytes: borrowing Span<XML.Byte>, at start: Int) throws(XML.Error) -> (value: UInt32, index: Int) {
     var value: UInt32 = 0
     var index = start
+    var overflow: Bool
 
     while index < bytes.count, bytes[index] != UInt8(ascii: ";") {
       let digit: UInt32 = switch bytes[index] {
@@ -60,11 +61,11 @@ private enum Radix {
       default:
         throw .invalidCharacter
       }
-      let (multiplied, mulOverflow) = value.multipliedReportingOverflow(by: self.base)
-      guard !mulOverflow else { throw .invalidCharacter }
-      let (updated, addOverflow) = multiplied.addingReportingOverflow(digit)
-      guard !addOverflow else { throw .invalidCharacter }
-      value = updated
+
+      (value, overflow) = value.multipliedReportingOverflow(by: base)
+      guard !overflow else { throw .invalidCharacter }
+      (value, overflow) = value.addingReportingOverflow(digit)
+      guard !overflow else { throw .invalidCharacter }
       index += 1
     }
 
@@ -72,12 +73,11 @@ private enum Radix {
     return (value, index)
   }
 
+  @inline(__always)
   private var base: UInt32 {
     switch self {
-    case .decimal:
-      10
-    case .hexadecimal:
-      16
+    case .decimal:      10
+    case .hexadecimal:  16
     }
   }
 }

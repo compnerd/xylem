@@ -50,7 +50,7 @@ extension XPath {
         }
         // Could be the start of a decimal number: .5
         if index < bytes.count, bytes[index].isASCIIDigit {
-          return try fraction(integer: 0)
+          return fraction(integer: 0)
         }
         return .dot
 
@@ -144,12 +144,12 @@ extension XPath {
       }
       if index < bytes.count, bytes[index] == UInt8(ascii: ".") {
         advance()
-        return try fraction(integer: value)
+        return fraction(integer: value)
       }
       return .number(value)
     }
 
-    private mutating func fraction(integer: Double) throws(XPath.Error) -> Token {
+    private mutating func fraction(integer: Double) -> Token {
       var frac: Double = 0
       var place: Double = 0.1
       while index < bytes.count, bytes[index].isASCIIDigit {

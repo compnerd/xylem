@@ -124,8 +124,9 @@ extension XML.Lexer {
   private mutating func run(stop: XML.Byte) {
     while cursor < bytes.count {
       let byte = bytes[cursor]
-      if byte == stop || byte == UInt8(ascii: "<") || byte == UInt8(ascii: "&")
-          || (byte &- 0x20) > 0x5f { break }
+      let sentinel = byte == stop || byte == UInt8(ascii: "<") || byte == UInt8(ascii: "&")
+      let control = (byte &- 0x20) > 0x5f
+      if sentinel || control { break }
       cursor += 1
     }
   }
@@ -161,8 +162,8 @@ extension XML.Lexer {
       while buffer.count - offset >= 16 {
         let chunk = base.loadUnaligned(fromByteOffset: offset, as: SIMD16<UInt8>.self)
         let sentinels = (chunk .== vStop) .| (chunk .== vLT) .| (chunk .== vAmp)
-        let controls  = (chunk &- vShift) .> vLimit
-        if any(sentinels .| controls) { break }
+        let reject = (chunk &- vShift) .> vLimit
+        if any(sentinels .| reject) { break }
         offset += 16
       }
 
@@ -175,8 +176,9 @@ extension XML.Lexer {
         let sentinels: UInt64 = ((xStop &- ones) & ~xStop)
                               | ((xLT   &- ones) & ~xLT  )
                               | ((xAmp  &- ones) & ~xAmp )
-        let controls: UInt64 = word | ((word &- 0x2020_2020_2020_2020) & ~word)
-        guard (sentinels | controls) & highs == 0 else { break }
+        // High bits mark bytes outside printable ASCII (either control or non-ASCII).
+        let reject: UInt64 = word | ((word &- 0x2020_2020_2020_2020) & ~word)
+        guard (sentinels | reject) & highs == 0 else { break }
         offset += 8
       }
     }
@@ -184,8 +186,11 @@ extension XML.Lexer {
     // Scalar tail.
     while cursor < bytes.count {
       let byte = bytes[cursor]
-      if byte == UInt8(ascii: "]") || byte == UInt8(ascii: "<") || byte == UInt8(ascii: "&")
-          || (byte &- 0x20) > 0x5f { break }
+      let sentinel = byte == UInt8(ascii: "]")
+                  || byte == UInt8(ascii: "<")
+                  || byte == UInt8(ascii: "&")
+      let control = (byte &- 0x20) > 0x5f
+      if sentinel || control { break }
       cursor += 1
     }
   }
@@ -325,6 +330,22 @@ extension XML.Lexer {
 // MARK: - Lexer Tokens
 
 extension XML.Lexer {
+  @inline(__always)
+  @_lifetime(borrow self)
+  private func token(start markup: Int,
+                     name: SourceRange,
+                     attributes range: SourceRange,
+                     namespaced: Bool,
+                     closed: Bool) -> Located<XML.Token> {
+    Located(value: .start(name: bytes.extracting(name),
+                          attributes: XML.UnresolvedAttributes(source: bytes,
+                                                               range: range,
+                                                               records: self.attributes,
+                                                               namespaced: namespaced),
+                          closed: closed),
+            source: source(from: markup))
+  }
+
   // [16] PI       ::= '<?' PITarget (S (Char* - (Char* '?>' Char*)))? '?>'
   // [17] PITarget ::= Name - (('X' | 'x') ('M' | 'm') ('L' | 'l'))
   @_lifetime(self: copy self)
@@ -526,13 +547,8 @@ extension XML.Lexer {
       let range = SourceRange(attributes ..< cursor)
       step()  // consume '>' or '/'
       if closed { try consume(UInt8(ascii: ">")) }
-      return Located(value: .start(name: bytes.extracting(name),
-                                   attributes: XML.UnresolvedAttributes(source: bytes,
-                                                                        range: range,
-                                                                        records: self.attributes,
-                                                                        namespaced: false),
-                                   closed: closed),
-                     source: source(from: start))
+      return token(start: start, name: name, attributes: range,
+                   namespaced: false, closed: closed)
     }
 
     var namespaced = false
@@ -541,19 +557,15 @@ extension XML.Lexer {
     while cursor < bytes.count {
       let spaced = spaces()
       guard cursor < bytes.count else { throw .unexpectedEOF }
-      switch bytes[cursor] {
+      let byte = bytes[cursor]
+      switch byte {
       case UInt8(ascii: ">"), UInt8(ascii: "/"):
-        let closed = bytes[cursor] == UInt8(ascii: "/")
+        let closed = byte == UInt8(ascii: "/")
         let range = SourceRange(attributes ..< cursor)
         step()  // consume '>' or '/'
         if closed { try consume(UInt8(ascii: ">")) }
-        return Located(value: .start(name: bytes.extracting(name),
-                                     attributes: XML.UnresolvedAttributes(source: bytes,
-                                                                          range: range,
-                                                                          records: self.attributes,
-                                                                          namespaced: namespaced),
-                                     closed: closed),
-                       source: source(from: start))
+        return token(start: start, name: name, attributes: range,
+                     namespaced: namespaced, closed: closed)
       default:
         if requiresSpace, !spaced { throw .invalidCharacter }
         let record = try attribute(at: attributes, namespaced: &namespaced)

@@ -98,7 +98,7 @@ private struct Builder: Handler {
 
   fileprivate mutating func processing(target: Span<XML.Byte>, data: Span<XML.Byte>?) {
     var node = Document.Node(kind: .processingInstruction)
-    node.name = (store(target), target.fnv1a32())
+    node.name = (store(target), FNV1a.hash32(target))
     if let data { node.value = store(data) }
     _ = append(node)
   }
@@ -139,7 +139,7 @@ private struct Builder: Handler {
                                namespace uri: Span<XML.Byte>?,
                                attributes: borrowing XML.ResolvedAttributes) -> Int32 {
     var node = Document.Node(kind: .element)
-    node.name = (store(name.bytes), name.local.fnv1a32())
+    node.name = (store(name.bytes), FNV1a.hash32(name.local))
     node.colon = name.colon.map(Int32.init) ?? -1
     let base = Int32(self.attributes.count)
     node.namespace = slice(uri)
@@ -168,7 +168,7 @@ private struct Builder: Handler {
   private mutating func attribute(named name: borrowing XML.QualifiedNameView,
                                   namespace uri: Span<XML.Byte>?,
                                   value: borrowing Span<XML.Byte>) -> Document.Attribute {
-    return Document.Attribute(name: (store(name.bytes), name.local.fnv1a32()),
+    return Document.Attribute(name: (store(name.bytes), FNV1a.hash32(name.local)),
                               colon: name.colon.map(Int32.init) ?? -1,
                               namespace: slice(uri),
                               value: store(value))
@@ -176,8 +176,9 @@ private struct Builder: Handler {
 
   @inline(__always)
   private func identifies(_ name: borrowing XML.QualifiedNameView) -> Bool {
-    name.local == StaticString("id")
-      && (name.prefix == nil || name.prefix == StaticString("xml"))
+    let prefix = name.prefix
+    return name.local == StaticString("id")
+      && (prefix == nil || prefix == StaticString("xml"))
   }
 
   @inline(__always)

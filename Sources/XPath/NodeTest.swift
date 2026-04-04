@@ -17,21 +17,9 @@ extension XPath {
 }
 
 extension XPath.NodeTest {
-  internal var unprefixed: (local: String, hash: UInt32)? {
-    guard case .name(nil, let local, let hash) = self else { return nil }
-    return (local, hash)
-  }
-
   internal var hash: UInt32? {
-    unprefixed?.hash
-  }
-
-  internal var namespaced: Bool {
-    switch self {
-    case .any(namespace: let ns): return ns != nil
-    case .name(let prefix, _, _): return prefix != nil
-    default:                      return false
-    }
+    guard case .name(nil, _, let hash) = self else { return nil }
+    return hash
   }
 }
 
@@ -41,9 +29,9 @@ extension XPath.NodeTest {
       let prefix = String(raw[..<colon])
       let local  = String(raw[raw.index(after: colon)...])
       self = local == "*" ? .any(namespace: prefix)
-                          : .name(prefix: prefix, local: local, hash: local.fnv1a32())
+                          : .name(prefix: prefix, local: local, hash: FNV1a.hash32(local))
     } else {
-      self = .name(prefix: nil, local: raw, hash: raw.fnv1a32())
+      self = .name(prefix: nil, local: raw, hash: FNV1a.hash32(raw))
     }
   }
 }

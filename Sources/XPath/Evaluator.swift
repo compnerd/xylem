@@ -83,9 +83,9 @@ extension XPath.Expression {
       if case let .path(path) = lhs,
          !path.absolute, path.steps.count == 1,
          path.steps[0].axis == .attribute, path.steps[0].predicates.isEmpty,
-         let name = path.steps[0].test.unprefixed,
+         let hash = path.steps[0].test.hash,
          case let .string(literal) = rhs {
-        let matched = document.attribute(of: context.node, hash: name.hash,
+        let matched = document.attribute(of: context.node, hash: hash,
                                          equals: literal)
         return .bool(operation == .eq ? matched : !matched)
       }

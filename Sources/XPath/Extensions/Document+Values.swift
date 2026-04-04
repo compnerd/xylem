@@ -7,8 +7,7 @@ internal import DOMParser
 extension Document {
   // XPath string-value of a node per XPath 1.0 section 5.
   internal func string(of handle: Reference) -> String {
-    if let (element, position) = handle.attribute {
-      let attribute = attributes[Int(nodes[element].attributes.base) + position]
+    if let attribute = attribute(of: handle) {
       return string(attribute.value)
     }
 
@@ -19,7 +18,7 @@ extension Document {
       // Fast path: single text or cdata child; return directly from storage.
       if node.children.first == node.children.last {
         let child = nodes[Int(first.index)]
-        if child.kind == Document.NodeKind.text || child.kind == Document.NodeKind.cdata,
+        if child.kind.textual,
            child.value.present {
           return string(child.value)
         }
@@ -29,7 +28,7 @@ extension Document {
       utf8.reserveCapacity(64)
       outer: while true {
         let node = nodes[Int(current.index)]
-        if node.kind == Document.NodeKind.text || node.kind == Document.NodeKind.cdata,
+        if node.kind.textual,
            node.value.present {
           span(node.value).withUnsafeBufferPointer { utf8.append(contentsOf: $0) }
         }
@@ -53,8 +52,7 @@ extension Document {
 
   @inline(__always)
   internal func number(of handle: Reference) -> Double {
-    if let (element, position) = handle.attribute {
-      let attribute = attributes[Int(nodes[element].attributes.base) + position]
+    if let attribute = attribute(of: handle) {
       guard attribute.value.present else { return .nan }
       return number(attribute.value)
     }

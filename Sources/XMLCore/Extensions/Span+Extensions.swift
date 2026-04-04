@@ -2,20 +2,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 extension Span where Element == XML.Byte {
-  // MARK: - FNV-1a32
-
-  @inline(__always)
-  package func fnv1a32() -> UInt32 {
-    withUnsafeBufferPointer { buffer in
-      var hash: UInt32 = 2_166_136_261
-      for byte in buffer {
-        hash ^= UInt32(byte)
-        hash &*= 16_777_619
-      }
-      return hash
-    }
-  }
-
   // MARK: - Encoding
 
   // XML Appendix F

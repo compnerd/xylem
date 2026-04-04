@@ -44,7 +44,7 @@ internal struct NamespaceResolver: ~Copyable, ~Escapable {
     arena.reserve(capacity: max(64, source.count >> 4))
     let prefix = arena.intern("xml")
     let uri = arena.intern("http://www.w3.org/XML/1998/namespace")
-    bindings.append(Binding(prefix: prefix, hash: FNVHasher.hash("xml"), uri: uri))
+    bindings.append(Binding(prefix: prefix, hash: FNV1a.hash64("xml"), uri: uri))
   }
 }
 
@@ -285,7 +285,7 @@ extension NamespaceResolver {
   }
 
   private func binding(prefix: borrowing Span<XML.Byte>) -> Int? {
-    let hash = FNVHasher.hash(prefix)
+    let hash = FNV1a.hash64(prefix)
     for index in bindings.indices.reversed() {
       let binding = bindings[index]
       guard binding.hash == hash, let candidate = binding.prefix else { continue }
@@ -314,18 +314,15 @@ extension NamespaceResolver {
                                for bytes: borrowing Span<XML.Byte>,
                                at index: Int,
                                namespace: XML.ResolvedAttributes.Reference?) throws(XML.Error) {
-    let part = local(name: record.name, colon: record.colon, in: bytes)
-    // Capture records and storage as local lets so the closure retains each
-    // array once (vs calling the computed-property getter on every invocation).
-    // attributes.records and attributes.visited are distinct tuple elements so
-    // mutating visited does not conflict with reading records/store here.
+    let name = local(name: record.name, colon: record.colon, in: bytes)
+    // Capture once so the probe closure does not repeatedly hit tuple accessors.
     let records = self.attributes.records.front
     let storage = self.attributes.records.store.bytes
     guard self.attributes.visited.insert(index,
-                                         hash: FNVHasher.hash(namespace, local: part, in: bytes, storage: storage.span),
+                                         hash: hash(namespace: namespace, local: name, in: bytes, storage: storage.span),
                                          equals: {
                                            let other = records[$0]
-                                           guard part == local(name: other.name, colon: other.colon, in: bytes) else {
+                                           guard name == local(name: other.name, colon: other.colon, in: bytes) else {
                                              return false
                                            }
                                            return Bytes.equal(namespace, other.namespace, in: bytes, storage: storage.span)
@@ -340,7 +337,7 @@ extension NamespaceResolver {
                                in records: borrowing Span<XML.UnresolvedAttributes.Record>,
                                bytes: borrowing Span<XML.Byte>) throws(XML.Error) {
     guard self.attributes.visited.insert(index,
-                                         hash: FNVHasher.hash(name),
+                                         hash: FNV1a.hash64(name),
                                          equals: { name == bytes.extracting(records[$0].name) }) == nil else {
       throw .invalidAttribute
     }
@@ -350,28 +347,28 @@ extension NamespaceResolver {
                         uri reference: XML.ResolvedAttributes.Reference) throws(XML.Error) -> UInt64 {
     let uri = span(for: reference)
     if uri == StaticString("http://www.w3.org/2000/xmlns/") { throw .invalidAttribute }
+    let xml = uri == StaticString("http://www.w3.org/XML/1998/namespace")
 
     guard let prefix else {
-      if uri == StaticString("http://www.w3.org/XML/1998/namespace") { throw .invalidAttribute }
+      guard !xml else { throw .invalidAttribute }
       return 0
     }
 
-    let namespace = span(for: prefix)
-    if namespace == StaticString("xmlns") { throw .invalidAttribute }
+    let name = span(for: prefix)
+    if name == StaticString("xmlns") { throw .invalidAttribute }
     do {
-      try XML.QualifiedName.validate(namespace)
+      try XML.QualifiedName.validate(name)
     } catch {
       throw .invalidAttribute
     }
 
-    if namespace == StaticString("xml") {
-      guard uri == StaticString("http://www.w3.org/XML/1998/namespace") else { throw .invalidAttribute }
-      return FNVHasher.hash(namespace)
+    if name == StaticString("xml") {
+      guard xml else { throw .invalidAttribute }
+    } else {
+      guard !uri.isEmpty, !xml else { throw .invalidAttribute }
     }
 
-    guard !uri.isEmpty else { throw .invalidAttribute }
-    if uri == StaticString("http://www.w3.org/XML/1998/namespace") { throw .invalidAttribute }
-    return FNVHasher.hash(namespace)
+    return FNV1a.hash64(name)
   }
 
   @inline(__always)

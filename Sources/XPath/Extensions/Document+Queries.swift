@@ -12,14 +12,8 @@ extension Document {
   }
 
   @inline(__always)
-  private func attribute(_ node: Reference) -> Attribute? {
-    guard let (element, position) = node.attribute else { return nil }
-    return attributes[Int(nodes[element].attributes.base) + position]
-  }
-
-  @inline(__always)
   private func qualified(_ node: Reference) -> (spelling: Slice, colon: Int32)? {
-    if let attribute = attribute(node) {
+    if let attribute = attribute(of: node) {
       return (attribute.name.spelling, attribute.colon)
     }
 
@@ -59,7 +53,7 @@ extension Document {
   internal func matches(attribute hash: UInt32, local localName: String,
                         namespace required: String?,
                         of node: Reference) -> Bool {
-    guard let attribute = attribute(node) else { return false }
+    guard let attribute = attribute(of: node) else { return false }
     guard attribute.name.hash == hash else { return false }
     guard local(attribute.name.spelling, colon: attribute.colon) == localName else { return false }
     guard let required else { return attribute.namespace.absent }
@@ -74,7 +68,7 @@ extension Document {
 
   @_lifetime(borrow self)
   internal func namespace(of node: Reference) -> Span<XML.Byte>? {
-    if let attribute = attribute(node) {
+    if let attribute = attribute(of: node) {
       guard attribute.namespace.present else { return nil }
       return span(attribute.namespace)
     }
