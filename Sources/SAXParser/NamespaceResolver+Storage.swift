@@ -89,7 +89,8 @@ internal struct ProbeSet {
 
     if generation == .max {
       generation = 1
-      buckets.withUnsafeMutableBufferPointer { $0.update(repeating: (0, 0)) }
+      var span = buckets.mutableSpan
+      span.update(repeating: (0, 0))
     } else {
       generation &+= 1
     }

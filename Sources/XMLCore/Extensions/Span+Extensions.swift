@@ -6,14 +6,12 @@ extension Span where Element == XML.Byte {
 
   @inline(__always)
   package func fnv1a32() -> UInt32 {
-    withUnsafeBufferPointer { buffer in
-      var hash: UInt32 = 2_166_136_261
-      for byte in buffer {
-        hash ^= UInt32(byte)
-        hash &*= 16_777_619
-      }
-      return hash
+    var hash: UInt32 = 2_166_136_261
+    for i in 0 ..< count {
+      hash ^= UInt32(self[i])
+      hash &*= 16_777_619
     }
+    return hash
   }
 
   // MARK: - Encoding
@@ -110,12 +108,10 @@ extension Span where Element == XML.Byte {
   @inline(__always)
   package static func == (_ lhs: borrowing Span<Element>, _ rhs: borrowing Span<Element>) -> Bool {
     guard lhs.count == rhs.count else { return false }
-    if lhs.isEmpty { return true }
-    return lhs.withUnsafeBufferPointer { lhs in
-      return rhs.withUnsafeBufferPointer { rhs in
-        return lhs.elementsEqual(rhs)
-      }
+    for i in 0 ..< lhs.count {
+      if lhs[i] != rhs[i] { return false }
     }
+    return true
   }
 
   // MARK: - Ranges

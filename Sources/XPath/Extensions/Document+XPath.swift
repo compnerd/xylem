@@ -29,8 +29,6 @@ extension Document {
 
   @inline(__always)
   internal func number(_ slice: Slice) -> Double {
-    span(slice).withUnsafeBufferPointer {
-      Double(String(decoding: $0, as: UTF8.self).trimmed()) ?? .nan
-    }
+    Double(string(slice).trimmed()) ?? .nan
   }
 }

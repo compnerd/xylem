@@ -21,11 +21,9 @@ internal struct FNVHasher {
 
   @inline(__always)
   private mutating func mix(_ bytes: borrowing Span<XML.Byte>) {
-    bytes.withUnsafeBufferPointer { buffer in
-      for byte in buffer {
-        value ^= UInt64(byte)
-        value &*= Self.prime
-      }
+    for i in 0 ..< bytes.count {
+      value ^= UInt64(bytes[i])
+      value &*= Self.prime
     }
   }
 

@@ -4,15 +4,14 @@
 extension String {
   @inline(__always)
   package func fnv1a32() -> UInt32 {
-    var string = self
-    return string.withUTF8 { buffer in
-      var hash: UInt32 = 2_166_136_261
-      for byte in buffer {
-        hash ^= UInt32(byte)
-        hash &*= 16_777_619
-      }
-      return hash
+    let string = self
+    let span = string.utf8.span
+    var hash: UInt32 = 2_166_136_261
+    for i in 0 ..< span.count {
+      hash ^= UInt32(span[i])
+      hash &*= 16_777_619
     }
+    return hash
   }
 
   @inline(__always)
