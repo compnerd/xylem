@@ -6,9 +6,13 @@
 extension XML {
   package struct Lexer: ~Copyable, ~Escapable {
     package let bytes: Span<Byte>
-    package private(set) var location: XML.Location = XML.Location()
+    private var tracker = LocationTracker()
     private var cursor: Span<Byte>.Index
     private var attributes: [XML.UnresolvedAttributes.Record] = []
+
+    package var location: XML.Location {
+      @inline(__always) get { tracker.location(at: cursor) }
+    }
 
     @_lifetime(borrow input)
     package init(bytes input: Span<Byte>, cursor: Span<Byte>.Index = 0) {
@@ -40,31 +44,21 @@ extension XML {
 // MARK: - Lexer Cursor
 
 extension XML.Lexer {
-  // Advance by `distance` bytes of known ASCII non-newline content, adding
-  // `distance` columns to the location.  Use `step()` when the byte may be
-  // a newline.
-  @inline(__always)
-  @_lifetime(self: copy self)
-  private mutating func advance(_ distance: Int) {
-    cursor += distance
-    location.advance(distance)
-  }
-
-  // Advance by one byte, updating the location with full CR/LF/CRLF handling.
+  // Advance by one byte, tracking newlines for location.
   @inline(__always)
   @_lifetime(self: copy self)
   private mutating func step() {
-    cursor += 1
-    switch bytes[cursor - 1] {
+    switch bytes[cursor] {
     case UInt8(ascii: "\r"):
-      location.newline()
+      tracker.newline(at: cursor)
     case UInt8(ascii: "\n"):
-      if cursor < 2 || bytes[cursor - 2] != UInt8(ascii: "\r") {
-        location.newline()
+      if cursor >= 1 && bytes[cursor - 1] != UInt8(ascii: "\r") {
+        tracker.newline(at: cursor)
       }
     default:
-      location.advance()
+      break
     }
+    cursor += 1
   }
 
   @inline(__always)
@@ -73,7 +67,8 @@ extension XML.Lexer {
     guard cursor < bytes.count else { throw .unexpectedEOF }
     guard bytes[cursor] < 0x80 else {
       guard let decoded = try bytes.decodeScalar(at: cursor) else { throw .unexpectedEOF }
-      return advance(decoded.stride)
+      cursor += decoded.stride
+      return
     }
     step()
   }
@@ -81,17 +76,14 @@ extension XML.Lexer {
   @_lifetime(self: copy self)
   private mutating func advance(to target: Span<XML.Byte>.Index) {
     while cursor < target {
-      // Scan to the end of the current non-newline run. `advance(_:)` handles
-      // only columns, so it must not see CR or LF bytes.
+      // Bulk-skip non-newline bytes — only call step() on CR/LF.
       var position = cursor
       while position < target
           && bytes[position] != UInt8(ascii: "\r")
           && bytes[position] != UInt8(ascii: "\n") {
         position += 1
       }
-      advance(position - cursor)
-      // `cursor` is now at a newline byte (or target). `step()` consumes it and
-      // updates the location with full CR/LF/CRLF handling.
+      cursor = position
       if cursor < target { step() }
     }
   }
@@ -117,7 +109,7 @@ extension XML.Lexer {
       for index in 0 ..< buffer.count {
         guard bytes[cursor + index] == buffer[index] else { return .failure(.invalidCharacter) }
       }
-      advance(buffer.count)
+      cursor += buffer.count
       return .success(())
     }).get()
   }
@@ -130,14 +122,12 @@ extension XML.Lexer {
   @inline(__always)
   @_lifetime(self: copy self)
   private mutating func run(stop: XML.Byte) {
-    let start = cursor
     while cursor < bytes.count {
       let byte = bytes[cursor]
       if byte == stop || byte == UInt8(ascii: "<") || byte == UInt8(ascii: "&")
           || (byte &- 0x20) > 0x5f { break }
       cursor += 1
     }
-    location.advance(cursor - start)
   }
 
   // Bulk scanner for text nodes: SIMD16 → SWAR → scalar.
@@ -154,8 +144,6 @@ extension XML.Lexer {
   //   the scalar tail corrects them.  False negatives would be bugs.
   @_lifetime(self: copy self)
   private mutating func run() {
-    let start = cursor
-
     let ones:  UInt64 = 0x0101_0101_0101_0101  // unit in each byte lane
     let highs: UInt64 = 0x8080_8080_8080_8080  // MSB in each byte lane
 
@@ -200,7 +188,6 @@ extension XML.Lexer {
           || (byte &- 0x20) > 0x5f { break }
       cursor += 1
     }
-    location.advance(cursor - start)
   }
 
   // [3] S ::= (#x20 | #x9 | #xD | #xA)+
@@ -210,9 +197,13 @@ extension XML.Lexer {
   private mutating func spaces() -> Bool {
     let start = cursor
     while cursor < bytes.count, bytes[cursor] < 0x80, bytes[cursor].isXMLASCIIWhitespace {
-      cursor += 1
+      switch bytes[cursor] {
+      case UInt8(ascii: "\r"), UInt8(ascii: "\n"):
+        step()
+      default:
+        cursor += 1
+      }
     }
-    location.advance(cursor - start)
     return cursor > start
   }
 
@@ -223,7 +214,7 @@ extension XML.Lexer {
     guard cursor < bytes.count else { throw .invalidName }
 
     let start = cursor
-    try advance(XML.Name.scan(bytes.extracting(start...)).bytes)
+    cursor += try XML.Name.scan(bytes.extracting(start...)).bytes
     return start ..< cursor
   }
 
@@ -373,7 +364,7 @@ extension XML.Lexer {
       guard bytes[dash + 2] == UInt8(ascii: ">") else { throw .invalidCharacter }
       let content = bytes.extracting(comment ..< dash)
       advance(to: dash)
-      advance(3)
+      cursor += 3
       return Located(value: .comment(content),
                      source: source(from: markup))
     }
@@ -403,7 +394,7 @@ extension XML.Lexer {
       }
       let content = bytes.extracting(data ..< bracket)
       advance(to: bracket)
-      advance(3)
+      cursor += 3
       return Located(value: .cdata(content),
                      source: source(from: start))
     }
@@ -497,7 +488,7 @@ extension XML.Lexer {
       case _ where byte > 0x7f:
         guard let decoded = try bytes.decodeScalar(at: cursor),
               decoded.scalar.isXMLChar else { throw .invalidCharacter }
-        advance(decoded.stride)
+        cursor += decoded.stride
       default:
         throw .invalidCharacter
       }
@@ -618,7 +609,7 @@ extension XML.Lexer {
                        processed: processed)
       case UInt8(ascii: "&"):
         processed = false
-        advance(1)
+        cursor += 1
       case UInt8(ascii: "]"):
         // Per XML 1.0 §2.4, ']]>' is forbidden in character data.
         if cursor + 2 < bytes.count,
@@ -626,7 +617,7 @@ extension XML.Lexer {
            bytes[cursor + 2] == UInt8(ascii: ">") {
           throw .invalidCharacter
         }
-        advance(1)
+        cursor += 1
       case _ where byte > 0x7f:
         guard let decoded = try bytes.decodeScalar(at: cursor) else {
           throw .unexpectedEOF
@@ -635,7 +626,7 @@ extension XML.Lexer {
         guard decoded.scalar.value != 0xfffe, decoded.scalar.value != 0xffff else {
           throw .invalidCharacter
         }
-        advance(decoded.stride)
+        cursor += decoded.stride
       default:
         // [2]: the only legal ASCII control chars are #x9 (#xA, #xD).
         guard byte.isXMLASCIIWhitespace else { throw .invalidCharacter }
