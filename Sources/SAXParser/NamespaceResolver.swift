@@ -52,21 +52,30 @@ internal struct NamespaceResolver: ~Copyable, ~Escapable {
 
 extension NamespaceResolver {
   @_lifetime(&self)
+  @inline(__always)
+  internal mutating func clear() {
+    guard self.attributes.records.front.isEmpty else {
+      return self.attributes.records.front.removeAll(keepingCapacity: true)
+    }
+  }
+
+  @_lifetime(&self)
   internal mutating func mappings(for attributes: borrowing XML.UnresolvedAttributes) throws(XML.Error) -> Range<Int> {
+    let bindings = bindings.count
+
+    scopes.push(bindings)
+
     if attributes.isEmpty {
-      scopes.push(-1)
-      self.attributes.records.front.removeAll(keepingCapacity: true)
-      return bindings.count ..< bindings.count
+      clear()
+      return bindings ..< bindings
     }
 
-    let base = bindings.count
-    scopes.push(base)
     if attributes.namespaced {
       try resolve(qualified: attributes)
     } else {
       try resolve(unqualified: attributes)
     }
-    return base ..< bindings.count
+    return bindings ..< self.bindings.count
   }
 
   @_lifetime(&self)
@@ -82,8 +91,9 @@ extension NamespaceResolver {
       // element with 1–2 attributes this eliminates ~5–6 ns of overhead.
       for index in records.indices {
         let attribute = records[index]
+        let name = bytes.extracting(attribute.name)
         for prior in 0 ..< index {
-          if bytes.extracting(attribute.name) == bytes.extracting(records[prior].name) {
+          if name == bytes.extracting(records[prior].name) {
             throw .invalidAttribute
           }
         }
@@ -164,7 +174,6 @@ extension NamespaceResolver {
 
   internal mutating func popScope() throws(XML.Error) -> Range<Int> {
     guard let base = scopes.pop() else { throw .invalidDocument }
-    guard base >= 0 else { return 0 ..< 0 }
     return base ..< bindings.count
   }
 
