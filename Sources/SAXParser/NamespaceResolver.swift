@@ -7,7 +7,7 @@ internal struct NamespaceResolver: ~Copyable, ~Escapable {
   // MARK: - Types
 
   internal typealias Reference = XML.ResolvedAttributes.Reference
-  private typealias Record = XML.ResolvedAttributes.Record
+  internal typealias Record = XML.ResolvedAttributes.Record
 
   internal struct Element: ~Escapable {
     internal let namespace: Reference?
@@ -28,6 +28,17 @@ internal struct NamespaceResolver: ~Copyable, ~Escapable {
     fileprivate var generation: UInt32 = 0
   }
 
+  internal struct AttributeResolutionState {
+    internal var records = DoubleBuffer<Record>()
+    internal var visited = ProbeSet()
+
+    @inline(__always)
+    internal mutating func clear() {
+      guard !records.front.isEmpty else { return }
+      records.front.removeAll(keepingCapacity: true)
+    }
+  }
+
   // MARK: - Storage
 
   private let source: Span<XML.Byte>
@@ -36,7 +47,7 @@ internal struct NamespaceResolver: ~Copyable, ~Escapable {
   private var defaultNamespace: Int?
   private var generation: UInt32 = 0
   private var scopes = Stack<Int>()
-  private var attributes: (records: DoubleBuffer<Record>, visited: ProbeSet) = (.init(), .init())
+  internal var attributes = AttributeResolutionState()
 
   @_lifetime(borrow source)
   internal init(source: borrowing Span<XML.Byte>) {
@@ -51,12 +62,9 @@ internal struct NamespaceResolver: ~Copyable, ~Escapable {
 // MARK: - Resolution
 
 extension NamespaceResolver {
-  @_lifetime(&self)
-  @inline(__always)
-  internal mutating func clear() {
-    guard self.attributes.records.front.isEmpty else {
-      return self.attributes.records.front.removeAll(keepingCapacity: true)
-    }
+  private enum Style {
+    case linear
+    case hashed
   }
 
   @_lifetime(&self)
@@ -66,7 +74,7 @@ extension NamespaceResolver {
     scopes.push(bindings)
 
     if attributes.isEmpty {
-      clear()
+      self.attributes.clear()
       return bindings ..< bindings
     }
 
@@ -82,31 +90,18 @@ extension NamespaceResolver {
   private mutating func resolve(unqualified attributes: borrowing XML.UnresolvedAttributes) throws(XML.Error) {
     let bytes = attributes.bytes
     let records = attributes.records
+    let style: Style = attributes.count > 4 ? .hashed : .linear
 
     self.attributes.records.cycle(capacity: attributes.count)
-
-    if attributes.count <= 4 {
-      // For small attribute lists use O(n²) linear scan for duplicate detection
-      // — avoids hash-table initialisation and FNV hashing.  For the typical
-      // element with 1–2 attributes this eliminates ~5–6 ns of overhead.
-      for index in records.indices {
-        let attribute = records[index]
-        let name = bytes.extracting(attribute.name)
-        for prior in 0 ..< index {
-          if name == bytes.extracting(records[prior].name) {
-            throw .invalidAttribute
-          }
-        }
-        try append(attribute, from: bytes)
-      }
-    } else {
+    if style == .hashed {
       self.attributes.visited.reset(count: attributes.count)
-      for index in records.indices {
-        let attribute = records[index]
-        let name = bytes.extracting(attribute.name)
-        try insert(name, at: index, in: records, bytes: bytes)
-        try append(attribute, from: bytes)
-      }
+    }
+
+    for index in records.indices {
+      let attribute = records[index]
+      let name = bytes.extracting(attribute.name)
+      try check(unique: name, in: records, to: index, style: style, bytes: bytes)
+      try append(attribute, from: bytes)
     }
   }
 
@@ -114,35 +109,31 @@ extension NamespaceResolver {
   private mutating func resolve(qualified attributes: borrowing XML.UnresolvedAttributes) throws(XML.Error) {
     let bytes = attributes.bytes
     let records = attributes.records
-    let source = attributes.range
+    var style: Style = attributes.count > 4 ? .hashed : .linear
+
     self.attributes.records.cycle(capacity: attributes.count)
     advance()
-    self.attributes.visited.reset(count: attributes.count)
+    if style == .hashed {
+      self.attributes.visited.reset(count: attributes.count)
+    }
 
+    let source = attributes.range
     for index in records.indices {
       let attribute = records[index]
       let name = bytes.extracting(attribute.name)
-      try insert(name, at: index, in: records, bytes: bytes)
-
-      if !attribute.declaration {
-        try XML.QualifiedName.validate(name, colon: attribute.colon)
-        try append(attribute, from: bytes)
-      } else {
-        try declare(prefix: attribute.prefix?.absolute(in: source),
-                    uri: try intern(binding: attribute, bytes: bytes, source: source))
-      }
+      try check(unique: name, in: records, to: index, style: style, bytes: bytes)
+      try emit(attribute, named: name, in: bytes, source: source)
     }
 
-    self.attributes.visited.reset(count: self.attributes.records.front.count)
+    style = self.attributes.records.front.count > 4 ? .hashed : .linear
+    if style == .hashed {
+      self.attributes.visited.reset(count: self.attributes.records.front.count)
+    }
+
     for index in self.attributes.records.front.indices {
       let record = self.attributes.records.front[index]
-      let namespace = if let colon = record.colon,
-             let binding = try binding(of: bytes.extracting(record.name), colon: colon, attribute: true) {
-          reference(for: binding, sourceCount: bytes.count)
-        } else {
-          nil as XML.ResolvedAttributes.Reference?
-        }
-      try unique(record: record, for: bytes, at: index, namespace: namespace)
+      let namespace = try bind(record, in: bytes)
+      try check(unique: record, namespace: namespace, to: index, style: style, in: bytes)
       let updated = XML.ResolvedAttributes.Record(name: record.name, colon: record.colon,
                                                   value: record.value, namespace: namespace)
       self.attributes.records.front[index] = updated
@@ -210,6 +201,73 @@ extension NamespaceResolver {
 // MARK: - Helpers
 
 extension NamespaceResolver {
+  @inline(__always)
+  @_lifetime(&self, borrow name, borrow records, borrow bytes)
+  private mutating func check(unique name: borrowing Span<XML.Byte>,
+                              in records: borrowing Span<XML.UnresolvedAttributes.Record>,
+                              to index: Int,
+                              style: Style,
+                              bytes: borrowing Span<XML.Byte>) throws(XML.Error) {
+    switch style {
+    case .linear:
+      for prior in 0 ..< index {
+        if name == bytes.extracting(records[prior].name) {
+          throw .invalidAttribute
+        }
+      }
+    case .hashed:
+      try insert(name, at: index, in: records, bytes: bytes)
+    }
+  }
+
+  @inline(__always)
+  @_lifetime(&self, borrow name, borrow bytes)
+  private mutating func emit(_ attribute: XML.UnresolvedAttributes.Record,
+                             named name: borrowing Span<XML.Byte>,
+                             in bytes: borrowing Span<XML.Byte>,
+                             source: SourceRange) throws(XML.Error) {
+    if attribute.declaration {
+      try declare(prefix: attribute.prefix?.absolute(in: source),
+                  uri: try intern(binding: attribute, bytes: bytes, source: source))
+    } else {
+      try XML.QualifiedName.validate(name, colon: attribute.colon)
+      try append(attribute, from: bytes)
+    }
+  }
+
+  @inline(__always)
+  @_lifetime(&self)
+  private mutating func bind(_ record: XML.ResolvedAttributes.Record,
+                             in bytes: borrowing Span<XML.Byte>) throws(XML.Error) -> Reference? {
+    if let colon = record.colon,
+       let binding = try binding(of: bytes.extracting(record.name), colon: colon, attribute: true) {
+      return reference(for: binding, sourceCount: bytes.count)
+    }
+    return nil
+  }
+
+  @inline(__always)
+  @_lifetime(&self)
+  private mutating func check(unique record: XML.ResolvedAttributes.Record,
+                              namespace: Reference?,
+                              to count: Int,
+                              style: Style,
+                              in bytes: borrowing Span<XML.Byte>) throws(XML.Error) {
+    switch style {
+    case .linear:
+      let name = local(name: record.name, colon: record.colon, in: bytes)
+      for index in 0 ..< count {
+        let prior = self.attributes.records.front[index]
+        guard name == local(name: prior.name, colon: prior.colon, in: bytes) else { continue }
+        if Bytes.equal(namespace, prior.namespace, in: bytes, storage: self.attributes.records.store.bytes.span) {
+          throw .invalidAttribute
+        }
+      }
+    case .hashed:
+      try unique(record: record, for: bytes, at: count, namespace: namespace)
+    }
+  }
+
   @inline(__always)
   @_lifetime(borrow self)
   private func span(for reference: XML.ResolvedAttributes.Reference) -> Span<XML.Byte> {

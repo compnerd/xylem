@@ -69,7 +69,7 @@ public struct SAXParser<Processor: Handler> {
         try dtd(name: name, id: (public: `public`, system: system), at: location)
 
       case let .start(name, attributes, true) where attributes.isEmpty:
-        namespace.clear()
+        namespace.attributes.clear()
         let element = try namespace.resolve(name)
 
         handler.location = location
@@ -345,7 +345,7 @@ extension SAXParser where Processor.Failure == Never {
         dtd(name: name, id: (public: `public`, system: system), at: location)
 
       case let .start(name, attributes, true) where attributes.isEmpty:
-        namespace.clear()
+        namespace.attributes.clear()
         let element = try namespace.resolve(name)
 
         handler.location = location
