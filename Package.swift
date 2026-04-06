@@ -1,6 +1,7 @@
 // swift-tools-version:6.2
 
 import PackageDescription
+import Foundation
 
 let xylem =
     Package(name: "xylem",
@@ -30,43 +31,46 @@ let xylem =
             ])
 
 #if !os(Windows)
-  xylem.dependencies.append(contentsOf: [
-    .package(url: "https://github.com/ordo-one/package-benchmark", exact: "1.28.0")
-  ])
-  xylem.targets.append(contentsOf: [
-    .executableTarget(name: "SAXParserBenchmark",
-                      dependencies: [
-                        "XMLCore",
-                        "SAXParser",
-                        .product(name: "Benchmark", package: "package-benchmark"),
-                      ],
-                      path: "Benchmarks/SAXParserBenchmark",
-                      plugins: [
-                        .plugin(name: "BenchmarkPlugin", package: "package-benchmark"),
-                      ]),
-    .executableTarget(name: "DOMParserBenchmark",
-                      dependencies: [
-                        "XMLCore",
-                        "SAXParser",
-                        "DOMParser",
-                        .product(name: "Benchmark", package: "package-benchmark"),
-                      ],
-                      path: "Benchmarks/DOMParserBenchmark",
-                      plugins: [
-                        .plugin(name: "BenchmarkPlugin", package: "package-benchmark"),
-                      ]),
-    .executableTarget(name: "XPathBenchmark",
-                      dependencies: [
-                        "XMLCore",
-                        "DOMParser",
-                        "XPath",
-                        .product(name: "Benchmark", package: "package-benchmark"),
-                      ],
-                      path: "Benchmarks/XPathBenchmark",
-                      plugins: [
-                        .plugin(name: "BenchmarkPlugin", package: "package-benchmark"),
-                      ]),
-  ])
+  let benchmarks = ProcessInfo.processInfo.environment["XYLEM_BENCHMARKS"] == nil ? false : true
+  if benchmarks {
+    xylem.dependencies.append(contentsOf: [
+      .package(url: "https://github.com/ordo-one/package-benchmark", exact: "1.28.0")
+    ])
+    xylem.targets.append(contentsOf: [
+      .executableTarget(name: "SAXParserBenchmark",
+                        dependencies: [
+                          "XMLCore",
+                          "SAXParser",
+                          .product(name: "Benchmark", package: "package-benchmark"),
+                        ],
+                        path: "Benchmarks/SAXParserBenchmark",
+                        plugins: [
+                          .plugin(name: "BenchmarkPlugin", package: "package-benchmark"),
+                        ]),
+      .executableTarget(name: "DOMParserBenchmark",
+                        dependencies: [
+                          "XMLCore",
+                          "SAXParser",
+                          "DOMParser",
+                          .product(name: "Benchmark", package: "package-benchmark"),
+                        ],
+                        path: "Benchmarks/DOMParserBenchmark",
+                        plugins: [
+                          .plugin(name: "BenchmarkPlugin", package: "package-benchmark"),
+                        ]),
+      .executableTarget(name: "XPathBenchmark",
+                        dependencies: [
+                          "XMLCore",
+                          "DOMParser",
+                          "XPath",
+                          .product(name: "Benchmark", package: "package-benchmark"),
+                        ],
+                        path: "Benchmarks/XPathBenchmark",
+                        plugins: [
+                          .plugin(name: "BenchmarkPlugin", package: "package-benchmark"),
+                        ]),
+    ])
+  }
 #endif
 
 for target in xylem.targets where !["XMLTSPlugin"].contains(target.name) {
