@@ -39,15 +39,20 @@ extension Span where Element == XML.Byte {
   }
 
   @inline(__always)
-  package func matches(_ literal: StaticString, at offset: Int = 0) -> Bool {
+  package func matches(_ literal: StaticString,
+                       at offset: Int = 0,
+                       insensitive: Bool = false) -> Bool {
     precondition(literal.hasPointerRepresentation)
 
+    let mask = UInt8(insensitive ? 0x20 : 0x00)
     return literal.withUTF8Buffer { utf8 in
       guard offset >= 0, offset <= count, utf8.count <= count - offset else {
         return false
       }
       for index in 0 ..< utf8.count {
-        guard self[offset + index] == utf8[index] else { return false }
+        guard (self[offset + index] | mask) == (utf8[index] | mask) else {
+          return false
+        }
       }
       return true
     }
