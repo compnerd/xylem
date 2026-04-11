@@ -367,8 +367,7 @@ extension XPath.Expression {
     switch test {
     case .node:    return true
     case .text:
-      let kind = document.kind(of: node)
-      return kind == .text || kind == .cdata
+      return document.kind(of: node).textual
     case .comment: return document.kind(of: node) == .comment
 
     case .any(namespace: nil):

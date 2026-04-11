@@ -63,6 +63,7 @@ public struct Document: ~Copyable, ~Escapable {
     }
 
     internal init(element: Int, position: Int) {
+      assert(position >= 0 && UInt64(position) <= Self.Mask)
       index = Self.TagBit | (UInt64(element) << Self.Shift) | UInt64(position)
     }
 

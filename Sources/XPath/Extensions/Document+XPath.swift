@@ -4,6 +4,13 @@
 internal import XMLCore
 internal import DOMParser
 
+extension Document.NodeKind {
+  @inline(__always)
+  internal var textual: Bool {
+    self == .text || self == .cdata
+  }
+}
+
 extension Document {
   internal enum NameType {
     case qualified
@@ -14,6 +21,15 @@ extension Document {
   internal func reference(_ index: Int32) -> Reference? {
     if index >= 0 { return Reference(index: Int(index)) }
     return nil
+  }
+
+  @inline(__always)
+  internal func attribute(of handle: Reference) -> Attribute? {
+    guard let (element, position) = handle.attribute else { return nil }
+    let node = nodes[element]
+    let base = Int(node.attributes.base)
+    assert(base >= 0 && position < Int(node.attributes.count))
+    return attributes[base + position]
   }
 
   @inline(__always)
