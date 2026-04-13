@@ -101,8 +101,8 @@ extension Span where Element == XML.Byte {
   @inline(__always)
   package static func == (_ lhs: borrowing Span<Element>, _ rhs: borrowing Span<Element>) -> Bool {
     guard lhs.count == rhs.count else { return false }
-    for i in 0 ..< lhs.count {
-      if lhs[i] != rhs[i] { return false }
+    for index in 0 ..< lhs.count {
+      guard lhs[index] == rhs[index] else { return false }
     }
     return true
   }

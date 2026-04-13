@@ -11,18 +11,16 @@ package enum FNV1a {
 
     @inline(__always)
     package mutating func mix(_ bytes: borrowing Span<UInt8>) {
-      for i in 0 ..< bytes.count {
-        value ^= UInt32(bytes[i])
+      for index in 0 ..< bytes.count {
+        value ^= UInt32(bytes[index])
         value &*= 0x0100_0193
       }
     }
 
     @inline(__always)
     package mutating func mix(_ string: borrowing String) {
-      let string = copy string
-      let span = string.utf8.span
-      for i in 0 ..< span.count {
-        value ^= UInt32(span[i])
+      for byte in string.utf8 {
+        value ^= UInt32(byte)
         value &*= 0x0100_0193
       }
     }
@@ -37,8 +35,8 @@ package enum FNV1a {
 
     @inline(__always)
     package mutating func mix(_ bytes: borrowing Span<UInt8>) {
-      for i in 0 ..< bytes.count {
-        value ^= UInt64(bytes[i])
+      for index in 0 ..< bytes.count {
+        value ^= UInt64(bytes[index])
         value &*= 0x0000_0100_0000_01b3
       }
     }

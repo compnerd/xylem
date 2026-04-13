@@ -220,8 +220,8 @@ private struct Parser: ~Copyable, ~Escapable {
 
     @inline(__always)
     private static func space(_ bytes: borrowing Span<XML.Byte>) -> Bool {
-      for i in 0 ..< bytes.count {
-        if !bytes[i].isXMLASCIIWhitespace { return false }
+      for index in 0 ..< bytes.count {
+        guard bytes[index].isXMLASCIIWhitespace else { return false }
       }
       return true
     }
