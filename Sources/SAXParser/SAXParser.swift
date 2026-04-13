@@ -220,7 +220,10 @@ private struct Parser: ~Copyable, ~Escapable {
 
     @inline(__always)
     private static func space(_ bytes: borrowing Span<XML.Byte>) -> Bool {
-      bytes.withUnsafeBufferPointer { $0.allSatisfy(\.isXMLASCIIWhitespace) }
+      for index in 0 ..< bytes.count {
+        guard bytes[index].isXMLASCIIWhitespace else { return false }
+      }
+      return true
     }
 
     mutating func validate(_ token: Located<XML.Token>,

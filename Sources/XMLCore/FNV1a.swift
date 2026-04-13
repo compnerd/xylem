@@ -11,22 +11,17 @@ package enum FNV1a {
 
     @inline(__always)
     package mutating func mix(_ bytes: borrowing Span<UInt8>) {
-      bytes.withUnsafeBufferPointer { buffer in
-        for byte in buffer {
-          value ^= UInt32(byte)
-          value &*= 0x0100_0193
-        }
+      for index in 0 ..< bytes.count {
+        value ^= UInt32(bytes[index])
+        value &*= 0x0100_0193
       }
     }
 
     @inline(__always)
     package mutating func mix(_ string: borrowing String) {
-      var string = copy string
-      string.withUTF8 { buffer in
-        for byte in buffer {
-          value ^= UInt32(byte)
-          value &*= 0x0100_0193
-        }
+      for byte in string.utf8 {
+        value ^= UInt32(byte)
+        value &*= 0x0100_0193
       }
     }
   }
@@ -40,11 +35,9 @@ package enum FNV1a {
 
     @inline(__always)
     package mutating func mix(_ bytes: borrowing Span<UInt8>) {
-      bytes.withUnsafeBufferPointer { buffer in
-        for byte in buffer {
-          value ^= UInt64(byte)
-          value &*= 0x0000_0100_0000_01b3
-        }
+      for index in 0 ..< bytes.count {
+        value ^= UInt64(bytes[index])
+        value &*= 0x0000_0100_0000_01b3
       }
     }
 
