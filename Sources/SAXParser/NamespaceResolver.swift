@@ -67,7 +67,6 @@ extension NamespaceResolver {
     case hashed
   }
 
-  @_lifetime(&self)
   internal mutating func mappings(for attributes: borrowing XML.UnresolvedAttributes) throws(XML.Error) -> Range<Int> {
     let bindings = bindings.count
 
@@ -86,7 +85,6 @@ extension NamespaceResolver {
     return bindings ..< self.bindings.count
   }
 
-  @_lifetime(&self)
   private mutating func resolve(unqualified attributes: borrowing XML.UnresolvedAttributes) throws(XML.Error) {
     let bytes = attributes.bytes
     let records = attributes.records
@@ -105,7 +103,6 @@ extension NamespaceResolver {
     }
   }
 
-  @_lifetime(&self)
   private mutating func resolve(qualified attributes: borrowing XML.UnresolvedAttributes) throws(XML.Error) {
     let bytes = attributes.bytes
     let records = attributes.records
@@ -202,7 +199,6 @@ extension NamespaceResolver {
 
 extension NamespaceResolver {
   @inline(__always)
-  @_lifetime(&self, borrow name, borrow records, borrow bytes)
   private mutating func check(unique name: borrowing Span<XML.Byte>,
                               in records: borrowing Span<XML.UnresolvedAttributes.Record>,
                               to index: Int,
@@ -221,7 +217,6 @@ extension NamespaceResolver {
   }
 
   @inline(__always)
-  @_lifetime(&self, borrow name, borrow bytes)
   private mutating func emit(_ attribute: XML.UnresolvedAttributes.Record,
                              named name: borrowing Span<XML.Byte>,
                              in bytes: borrowing Span<XML.Byte>,
@@ -236,7 +231,6 @@ extension NamespaceResolver {
   }
 
   @inline(__always)
-  @_lifetime(&self)
   private mutating func bind(_ record: XML.ResolvedAttributes.Record,
                              in bytes: borrowing Span<XML.Byte>) throws(XML.Error) -> Reference? {
     if let colon = record.colon,
@@ -247,7 +241,6 @@ extension NamespaceResolver {
   }
 
   @inline(__always)
-  @_lifetime(&self)
   private mutating func check(unique record: XML.ResolvedAttributes.Record,
                               namespace: Reference?,
                               to count: Int,

@@ -7,7 +7,7 @@ internal import XMLCore
 @_lifetime(borrow source, borrow storage)
 private func span(of reference: XML.ResolvedAttributes.Reference,
                   in source: borrowing Span<XML.Byte>,
-                  storage: Span<XML.Byte>) -> Span<XML.Byte> {
+                  storage: borrowing Span<XML.Byte>) -> Span<XML.Byte> {
   switch reference {
   case let .input(range):  source.extracting(range)
   case let .buffer(range): storage.extracting(range)
@@ -15,11 +15,10 @@ private func span(of reference: XML.ResolvedAttributes.Reference,
 }
 
 @inline(__always)
-@_lifetime(borrow source, borrow storage, borrow local)
 internal func hash(namespace: XML.ResolvedAttributes.Reference?,
                    local: borrowing Span<XML.Byte>,
                    in source: borrowing Span<XML.Byte>,
-                   storage: Span<XML.Byte>) -> UInt64 {
+                   storage: borrowing Span<XML.Byte>) -> UInt64 {
   var hash = FNV1a.Hash64()
   if let namespace {
     hash.mix(span(of: namespace, in: source, storage: storage))
@@ -36,7 +35,7 @@ internal enum Bytes {
   internal static func equal(_ lhs: XML.ResolvedAttributes.Reference,
                              _ rhs: XML.ResolvedAttributes.Reference,
                              in source: borrowing Span<XML.Byte>,
-                             storage: Span<XML.Byte>) -> Bool {
+                             storage: borrowing Span<XML.Byte>) -> Bool {
     span(of: lhs, in: source, storage: storage) == span(of: rhs, in: source, storage: storage)
   }
 
@@ -44,7 +43,7 @@ internal enum Bytes {
   internal static func equal(_ lhs: XML.ResolvedAttributes.Reference?,
                              _ rhs: XML.ResolvedAttributes.Reference?,
                              in source: borrowing Span<XML.Byte>,
-                             storage: Span<XML.Byte>) -> Bool {
+                             storage: borrowing Span<XML.Byte>) -> Bool {
     guard let lhs else { return rhs == nil }
     guard let rhs else { return false }
     return equal(lhs, rhs, in: source, storage: storage)
