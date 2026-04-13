@@ -15,6 +15,7 @@ private func span(of reference: XML.ResolvedAttributes.Reference,
 }
 
 @inline(__always)
+@_lifetime(borrow source, borrow storage, borrow local)
 internal func hash(namespace: XML.ResolvedAttributes.Reference?,
                    local: borrowing Span<XML.Byte>,
                    in source: borrowing Span<XML.Byte>,
