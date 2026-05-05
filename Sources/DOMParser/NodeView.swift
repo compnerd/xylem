@@ -107,6 +107,15 @@ public struct NodeView: ~Copyable, ~Escapable {
     attribute == nil ? node.kind : .attribute
   }
 
+  /// The source location where this node was parsed, or `nil` for attribute
+  /// nodes or if location tracking was not available.
+  public var location: XML.Location? {
+    guard attribute == nil else { return nil }
+    let location = node.location
+    guard location.line > 0 else { return nil }
+    return XML.Location(line: Int(location.line), offset: Int(location.offset))
+  }
+
   /// The qualified name for element, PI, attribute, and DOCTYPE nodes; `nil`
   /// for text, comment, CDATA, and document nodes.
   public var name: XML.QualifiedNameView? {
