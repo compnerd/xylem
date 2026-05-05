@@ -1,7 +1,7 @@
 // Copyright © 2026 Saleem Abdulrasool <compnerd@compnerd.org>
 // SPDX-License-Identifier: BSD-3-Clause
 
-package import XMLCore
+public import XMLCore
 
 /// A self-contained DOM tree produced by `DOMParser`.
 ///
@@ -84,6 +84,15 @@ public struct Document: ~Copyable, ~Escapable {
   /// Returns the structural kind of `node`.
   public func kind(of node: Reference) -> NodeKind {
     node.attribute == nil ? self.node(node).kind : .attribute
+  }
+
+  /// Returns the source location where `node` was parsed, or `nil` if
+  /// location tracking was not available.
+  public func location(of node: Reference) -> XML.Location? {
+    guard node.attribute == nil else { return nil }
+    let location = self.node(node).location
+    guard location.line > 0 else { return nil }
+    return XML.Location(line: Int(location.line), offset: Int(location.offset))
   }
 
   // MARK: - Tree navigation (returns stable Reference handles)

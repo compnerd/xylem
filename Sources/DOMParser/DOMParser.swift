@@ -125,6 +125,9 @@ private struct Builder: Handler {
   }
 
   private mutating func append(_ node: consuming Document.Node) -> Int32 {
+    if let location {
+      node.location = (UInt32(location.line), UInt32(location.offset))
+    }
     let index = Int32(nodes.count)
     nodes.append(node)
     if let parent = stack.last { link(child: index, to: parent) }

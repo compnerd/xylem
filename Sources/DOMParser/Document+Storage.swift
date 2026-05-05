@@ -25,6 +25,7 @@ extension Document {
     package var extra: Slice = .absent                                      // DOCTYPE systemID; absent for all other kinds
     package var namespace: Slice = .absent                                  // element namespace URI
     package var attributes: (base: Int32, count: Int32) = (-1, 0)           // slice of Document.attributes; -1 = no attributes
+    package var location: (line: UInt32, offset: UInt32) = (0, 0)           // source position (1-based line + byte offset)
     // Tree links; -1 = absent
     package var parent: Int32 = -1
     package var children: (first: Int32, last: Int32) = (-1, -1)
