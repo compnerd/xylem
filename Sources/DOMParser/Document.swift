@@ -12,7 +12,7 @@ public import XMLCore
 /// Use ``Reference`` as a stable, copyable handle — suitable for
 /// collections, sets, and long-lived bookmarks.  Use ``view(of:)`` to obtain
 /// a ``NodeView`` cursor for efficient, property-style content access.
-public struct Document: ~Copyable, ~Escapable {
+public struct Document: ~Copyable, Sendable {
   @inline(__always)
   private func node(_ reference: Reference) -> Node {
     nodes[Int(reference.index)]
@@ -21,7 +21,7 @@ public struct Document: ~Copyable, ~Escapable {
   // MARK: - Public types
 
   /// The structural kind of a node in the document tree.
-  public enum NodeKind: UInt8 {
+  public enum NodeKind: UInt8, Sendable {
     /// The invisible root that contains the document element and its siblings.
     case document
     /// An element node: `<tag …>`.
@@ -48,7 +48,7 @@ public struct Document: ~Copyable, ~Escapable {
   /// Attribute references set bit 63 as a tag, with bits 62–16 holding the
   /// element index and bits 15–0 holding the attribute position:
   /// `index = TagBit | (element << 16) | position`
-  public struct Reference: Equatable, Hashable {
+  public struct Reference: Equatable, Hashable, Sendable {
     private static let TagBit: UInt64 = 1 << 63
     private static let Shift: UInt64 = 16
     private static let Mask: UInt64 = (1 << Shift) - 1  // 0xffff
@@ -173,7 +173,6 @@ public struct Document: ~Copyable, ~Escapable {
   // Populated at parse time from unqualified `id` and `xml:id` attributes.
   package var ids: [String: Reference]
 
-  @_lifetime(immortal)
   internal init(storage: consuming [XML.Byte], nodes: consuming [Node],
                 attributes: consuming [Attribute], ids: consuming [String: Reference] = [:]) {
     self.storage = consume storage
