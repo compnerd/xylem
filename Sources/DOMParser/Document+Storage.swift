@@ -7,7 +7,7 @@ extension Document {
   // An offset + length pair into `Document.storage`.
   // A sentinel value with `start == -1` represents an absent field;
   // consistent with the `-1` convention used for all other navigation fields.
-  package struct Slice {
+  package struct Slice: Sendable {
     package var start: Int32
     package var count: Int32
 
@@ -17,7 +17,7 @@ extension Document {
     package static var absent: Slice { Slice(start: -1, count: 0) }
   }
 
-  package struct Node {
+  package struct Node: Sendable {
     package var kind: NodeKind
     package var name: (spelling: Slice, hash: UInt32) = (.absent, 0)        // element / PI name; DOCTYPE name + FNV-1a32 of local name
     package var colon: Int32 = -1                                           // ':' offset within `name`; -1 = unqualified
@@ -34,7 +34,7 @@ extension Document {
     internal init(kind: NodeKind) { self.kind = kind }
   }
 
-  package struct Attribute {
+  package struct Attribute: Sendable {
     package var name: (spelling: Slice, hash: UInt32)   // attribute name + FNV-1a32 of local name
     package var colon: Int32                            // ':' offset within `name`; -1 = unqualified
     package var namespace: Slice                        // namespace URI; .absent if unqualified

@@ -25,7 +25,6 @@ public struct DOMParser {
   /// callers see a uniform `Span<XML.Byte>` API regardless.
   ///
   /// - Throws: ``XML/Error`` if the bytes are not well-formed XML 1.0.
-  @_lifetime(immortal)
   public static func parse(bytes: borrowing Span<XML.Byte>) throws -> Document {
     var parser = SAXParser(handler: Builder(reserving: bytes.count))
     try parser.parse(bytes: bytes)
