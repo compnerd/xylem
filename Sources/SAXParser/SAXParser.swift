@@ -37,6 +37,7 @@ public struct SAXParser<Processor: Handler> {
   ///
   /// - Throws: ``XML/Error`` for well-formedness violations, or
   ///   `Processor.Failure` if a handler callback throws.
+  @_disfavoredOverload
   public mutating func parse(bytes: Span<XML.Byte>) throws {
     var parser = Parser(bytes: bytes)
     var namespace = NamespaceResolver(source: bytes)
@@ -152,6 +153,7 @@ public struct SAXParser<Processor: Handler> {
   }
 
   @inline(__always)
+  @_disfavoredOverload
   private mutating func end(mappings namespace: inout NamespaceResolver,
                             location: XML.Location) throws {
     let bindings = try namespace.popScope()
