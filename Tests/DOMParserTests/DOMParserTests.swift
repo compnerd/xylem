@@ -142,6 +142,14 @@ private func nodeValue(of node: Document.Reference,
   return view.value.string
 }
 
+private func content(of node: Document.Reference, in document: borrowing Document)
+    -> (name: String?, local: String?, value: String?, namespace: String?) {
+  let name = document.name(of: node)
+  return (name: name.string, local: name?.local.string,
+          value: document.value(of: node).string,
+          namespace: document.namespace(of: node).string)
+}
+
 @Suite("DOMParser")
 internal struct DOMParserTests {
   @Test("preserves top-level markup and mixed element content")
@@ -213,6 +221,75 @@ internal struct DOMParserTests {
       let attrs = attributes(of: root, in: document)
       #expect(attrs["a"]?.namespace == nil)
       #expect(attrs["p:x"]?.namespace == "urn:p")
+    }
+  }
+
+  @Test("direct content accessors match node and attribute views")
+  internal func directAccessorsMatchViews() throws {
+    try withDocument(
+      """
+      <?xml version="1.0"?>
+      <!DOCTYPE r PUBLIC "-//pub" "sys.dtd">
+      <r xmlns='urn:r' xmlns:p='urn:p' a='1' p:x='&amp;2'><!--c--><?pi data?>t&lt;<![CDATA[d]]><p:e/></r>
+      """
+    ) { document in
+      var nodes: [Document.Reference] = []
+      var pending = children(of: document.root, in: document)
+      while !pending.isEmpty {
+        let node = pending.removeFirst()
+        nodes.append(node)
+        var attribute = document.firstAttribute(of: node)
+        while let current = attribute {
+          nodes.append(current)
+          attribute = document.nextAttribute(after: current)
+        }
+        pending.append(contentsOf: children(of: node, in: document))
+      }
+      #expect(Set(nodes.map { document.kind(of: $0) })
+                == [.dtd, .element, .attribute, .comment, .processingInstruction, .text, .cdata])
+
+      for node in nodes {
+        let direct = content(of: node, in: document)
+        let view = document.view(of: node)
+        let name = view.name
+        let local = name?.local.string
+        let value = view.value.string
+        let namespace = view.namespace.string
+        #expect(direct.name == name.string)
+        #expect(direct.local == local)
+        #expect(direct.value == value)
+        #expect(direct.namespace == namespace)
+      }
+
+      let top = content(of: document.root, in: document)
+      #expect(top.name == nil)
+      #expect(top.value == nil)
+
+      let root = try topLevelElement(in: document)
+      let element = content(of: root, in: document)
+      #expect(element.name == "r")
+      #expect(element.value == nil)
+      #expect(element.namespace == "urn:r")
+
+      guard let a = document.firstAttribute(of: root),
+            let x = document.nextAttribute(after: a) else {
+        Issue.record("missing attributes")
+        return
+      }
+      let unqualified = content(of: a, in: document)
+      #expect(unqualified.value == "1")
+      #expect(unqualified.namespace == nil)
+      let qualified = content(of: x, in: document)
+      #expect(qualified.name == "p:x")
+      #expect(qualified.local == "x")
+      #expect(qualified.value == "&2")
+      #expect(qualified.namespace == "urn:p")
+
+      let children = children(of: root, in: document)
+      #expect(children.map { document.kind(of: $0) }
+                == [.comment, .processingInstruction, .text, .cdata, .element])
+      #expect(children.map { content(of: $0, in: document).value }
+                == ["c", "data", "t<", "d", nil])
     }
   }
 

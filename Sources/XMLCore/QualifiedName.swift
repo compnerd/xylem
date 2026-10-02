@@ -46,7 +46,7 @@ extension XML {
       self.colon = try QualifiedName.scan(bytes, colon: colon)
     }
 
-    @_lifetime(borrow bytes)
+    @_lifetime(copy bytes)
     package init(unvalidated bytes: borrowing Span<Byte>, colon: Span<Byte>.Index? = nil) {
       self.bytes = copy bytes
       self.colon = colon

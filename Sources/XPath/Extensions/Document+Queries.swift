@@ -66,18 +66,6 @@ extension Document {
     return name(qualified.spelling, colon: qualified.colon, type: type)
   }
 
-  @_lifetime(borrow self)
-  internal func namespace(of node: Reference) -> Span<XML.Byte>? {
-    if let attribute = attribute(of: node) {
-      guard attribute.namespace.present else { return nil }
-      return span(attribute.namespace)
-    }
-
-    guard let node = entry(node) else { return nil }
-    guard node.namespace.present else { return nil }
-    return span(node.namespace)
-  }
-
   private func name(_ slice: Slice, colon: Int32, type: NameType) -> String {
     let name = span(slice)
     switch type {

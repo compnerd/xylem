@@ -95,6 +95,53 @@ public struct Document: ~Copyable, Sendable {
     return XML.Location(line: Int(location.line), offset: Int(location.offset))
   }
 
+  // MARK: - Node content
+
+  /// Returns the qualified name of `node` for element, processing
+  /// instruction, DOCTYPE, and attribute nodes; `nil` for all other kinds.
+  @_lifetime(borrow self)
+  public func name(of node: Reference) -> XML.QualifiedNameView? {
+    let (spelling, colon) = qualifiedName(of: node)
+    guard spelling.present else { return nil }
+    let bytes = storage.span.extracting(spelling.range)
+    return XML.QualifiedNameView(unvalidated: bytes,
+                                 colon: colon >= 0 ? Int(colon) : nil)
+  }
+
+  /// Returns the content of `node`: text for text, comment, and CDATA nodes;
+  /// data for processing instructions; the public identifier for DOCTYPE
+  /// nodes; the value for attribute nodes; `nil` otherwise.
+  @_lifetime(borrow self)
+  public func value(of node: Reference) -> Span<XML.Byte>? {
+    let value = attribute(of: node)?.value ?? self.node(node).value
+    guard value.present else { return nil }
+    return storage.span.extracting(value.range)
+  }
+
+  /// Returns the namespace URI of an element or attribute node, or `nil` if
+  /// it is unqualified or of any other kind.
+  @_lifetime(borrow self)
+  public func namespace(of node: Reference) -> Span<XML.Byte>? {
+    let namespace = attribute(of: node)?.namespace ?? self.node(node).namespace
+    guard namespace.present else { return nil }
+    return storage.span.extracting(namespace.range)
+  }
+
+  @inline(__always)
+  private func attribute(of node: Reference) -> Attribute? {
+    guard let (element, position) = node.attribute else { return nil }
+    return attributes[Int(nodes[element].attributes.base) + position]
+  }
+
+  @inline(__always)
+  private func qualifiedName(of node: Reference) -> (spelling: Slice, colon: Int32) {
+    if let attribute = attribute(of: node) {
+      return (attribute.name.spelling, attribute.colon)
+    }
+    let node = self.node(node)
+    return (node.name.spelling, node.colon)
+  }
+
   // MARK: - Tree navigation (returns stable Reference handles)
 
   /// Returns the parent of `node`, or `nil` for the document root.
